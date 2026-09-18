@@ -252,6 +252,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Insert Admin Notification
+    try {
+      await supabase.from("notifications").insert({
+        role_target: "admin",
+        user_id: body.customer.user_id || null,
+        order_id: order.id,
+        title: "🎉 New Order Placed!",
+        message: `${body.customer.name.trim()} placed order #${order.id.slice(0, 8).toUpperCase()} for ₱${totalAmount.toFixed(2)} (${paymentMethod === "cod" ? "COD" : "PayMongo"}).`,
+        type: "order_created",
+        is_read: false,
+      });
+    } catch {
+      // Non-blocking notification insert
+    }
+
     const origin =
       req.headers.get("origin") ||
       process.env.NEXT_PUBLIC_APP_URL ||

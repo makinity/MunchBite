@@ -6,6 +6,7 @@
 -- =============================================================================
 
 -- 1. DROP EXISTING TABLES (CLEAN SLATE)
+drop table if exists notifications cascade;
 drop table if exists order_items cascade;
 drop table if exists orders cascade;
 drop table if exists customers cascade;
@@ -89,6 +90,19 @@ create table reviews (
   created_at timestamptz not null default now()
 );
 
+-- Notifications
+create table notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  role_target varchar(20) not null default 'customer' check (role_target in ('admin', 'customer', 'all')),
+  order_id uuid references orders(id) on delete cascade,
+  title varchar(150) not null,
+  message text not null,
+  type varchar(50) not null default 'general',
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 -- Admins
 create table admins (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -104,12 +118,25 @@ alter table customers enable row level security;
 alter table orders enable row level security;
 alter table order_items enable row level security;
 alter table reviews enable row level security;
+alter table notifications enable row level security;
 alter table admins enable row level security;
 
 -- Public read policies
 create policy "Public can read categories" on categories for select using (true);
 create policy "Public can read products" on products for select using (true);
 create policy "Public can read reviews" on reviews for select using (is_published = true);
+
+-- Notifications policies
+create policy "Admins can view notifications" on notifications for select using (
+  exists (select 1 from admins where admins.id = auth.uid()) or role_target = 'admin'
+);
+create policy "Customers can view their notifications" on notifications for select using (
+  auth.uid() = user_id or role_target = 'customer' or role_target = 'all'
+);
+create policy "Users can update notification status" on notifications for update using (
+  auth.uid() = user_id or exists (select 1 from admins where admins.id = auth.uid())
+);
+create policy "Public can insert notifications" on notifications for insert with check (true);
 
 -- Public insert policies
 create policy "Public can insert customers" on customers for insert with check (true);

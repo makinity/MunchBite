@@ -18,6 +18,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 interface OrderItem {
   id: string;
@@ -69,6 +70,19 @@ export default function CustomerAccountPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  const fetchOrdersAndProfile = async () => {
+    try {
+      const res = await fetch("/api/customer/orders");
+      const data = await res.json();
+      if (data.success) {
+        if (data.profile) setProfile(data.profile);
+        if (data.orders) setOrders(data.orders as Order[]);
+      }
+    } catch (err) {
+      console.error("Error refreshing customer data:", err);
+    }
+  };
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -82,12 +96,7 @@ export default function CustomerAccountPage() {
         setIsAdmin(roleData.isAdmin);
 
         // 2. Fetch customer profile & orders
-        const res = await fetch("/api/customer/orders");
-        const data = await res.json();
-        if (data.success) {
-          if (data.profile) setProfile(data.profile);
-          if (data.orders) setOrders(data.orders as Order[]);
-        }
+        await fetchOrdersAndProfile();
       } catch (err) {
         console.error("Error loading customer data:", err);
       } finally {
@@ -97,6 +106,32 @@ export default function CustomerAccountPage() {
 
     loadData();
   }, [router]);
+
+  // Realtime subscription for live order changes
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("customer-account-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          fetchOrdersAndProfile();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        () => {
+          fetchOrdersAndProfile();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -138,6 +173,8 @@ export default function CustomerAccountPage() {
                 Admin Panel
               </Link>
             )}
+
+            <NotificationBell role={isAdmin ? "admin" : "customer"} />
 
             <Button variant="primary" size="sm" href="/order">
               <ShoppingBag size={15} />

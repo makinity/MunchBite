@@ -6,6 +6,8 @@ import { Menu, X, ShoppingCart, ChefHat, User, ShieldCheck } from "lucide-react"
 import Button from "@/components/ui/Button";
 import { createClient } from "@/lib/supabase/client";
 
+import NotificationBell from "@/components/notifications/NotificationBell";
+
 const navLinks = [
   { label: "Home", href: "/#home" },
   { label: "Menu", href: "/#best-sellers" },
@@ -18,6 +20,7 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Add shadow on scroll
   useEffect(() => {
@@ -36,12 +39,16 @@ export default function Navbar() {
         setIsAdmin(data.isAdmin);
 
         const supabase = createClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        setUserId(sessionData?.session?.user?.id || null);
+
         const { data: authListener } = supabase.auth.onAuthStateChange(
-          async () => {
+          async (_event, session) => {
             const freshRes = await fetch("/api/auth/role");
             const freshData = await freshRes.json();
             setIsLoggedIn(freshData.isLoggedIn);
             setIsAdmin(freshData.isAdmin);
+            setUserId(session?.user?.id || null);
           }
         );
 
@@ -122,6 +129,12 @@ export default function Navbar() {
                 </Link>
               )}
 
+              {/* Realtime Notification Bell */}
+              <NotificationBell
+                role={isAdmin ? "admin" : "customer"}
+                userId={userId}
+              />
+
               {isLoggedIn ? (
                 <Link
                   href="/account"
@@ -147,6 +160,11 @@ export default function Navbar() {
 
             {/* Mobile: Actions + Hamburger */}
             <div className="flex lg:hidden items-center gap-2">
+              <NotificationBell
+                role={isAdmin ? "admin" : "customer"}
+                userId={userId}
+              />
+
               {isAdmin && (
                 <Link
                   href="/admin/dashboard"

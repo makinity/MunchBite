@@ -23,6 +23,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { RealtimeProvider } from "@/components/notifications/RealtimeProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,8 +33,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={nunito.variable}>
       <body className="font-nunito antialiased">
-        {children}
-        <ChatBot />
+        <RealtimeProvider>
+          {children}
+          <ChatBot />
+        </RealtimeProvider>
       </body>
     </html>
   );

@@ -15,9 +15,9 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  Bell,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 // ─── Nav items ────────────────────────────────────────────────────────────────
 const NAV_ITEMS = [
@@ -221,12 +221,7 @@ function Topbar({
 
       {/* Right */}
       <div className="flex items-center gap-2">
-        <button
-          aria-label="Notifications"
-          className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-        >
-          <Bell size={18} />
-        </button>
+        <NotificationBell role="admin" />
         <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
           <div className="w-7 h-7 rounded-full bg-peach flex items-center justify-center text-white text-xs font-extrabold flex-shrink-0">
             A
