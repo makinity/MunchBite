@@ -7,6 +7,7 @@ interface OrderItem {
 }
 
 interface CustomerInfo {
+  user_id?: string | null;
   name: string;
   contact_number: string;
   address?: string;
@@ -33,6 +34,17 @@ export async function POST(req: NextRequest) {
     if (!body.customer?.contact_number?.trim()) {
       return NextResponse.json(
         { success: false, error: "Contact number is required." },
+        { status: 400 }
+      );
+    }
+
+    const cleanPhone = body.customer.contact_number.replace(/\s+/g, "");
+    if (!/^(09|\+639)\d{9}$/.test(cleanPhone)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Please provide a valid Philippine mobile number.",
+        },
         { status: 400 }
       );
     }
@@ -89,29 +101,76 @@ export async function POST(req: NextRequest) {
       return sum + (priceMap[item.product_id] ?? 0) * item.quantity;
     }, 0);
 
-    // ── Insert Customer ──────────────────────────
-    const { data: customer, error: customerError } = await supabase
-      .from("customers")
-      .insert({
-        name: body.customer.name.trim(),
-        contact_number: body.customer.contact_number.trim(),
-        address: body.customer.address?.trim() ?? null,
-      })
-      .select("id")
-      .single();
+    // ── Customer Deduplication / Link ──────────────────────────
+    let customerId: string | null = null;
 
-    if (customerError || !customer) {
-      return NextResponse.json(
-        { success: false, error: "Failed to save customer information." },
-        { status: 500 }
-      );
+    if (body.customer.user_id) {
+      const { data: existingUserCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("user_id", body.customer.user_id)
+        .maybeSingle();
+
+      if (existingUserCustomer) {
+        customerId = existingUserCustomer.id;
+        // Update contact or address if provided
+        await supabase
+          .from("customers")
+          .update({
+            name: body.customer.name.trim(),
+            contact_number: cleanPhone,
+            address: body.customer.address?.trim() ?? null,
+          })
+          .eq("id", customerId);
+      }
+    }
+
+    if (!customerId) {
+      // Check by contact number
+      const { data: existingPhoneCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("contact_number", cleanPhone)
+        .maybeSingle();
+
+      if (existingPhoneCustomer) {
+        customerId = existingPhoneCustomer.id;
+        await supabase
+          .from("customers")
+          .update({
+            name: body.customer.name.trim(),
+            address: body.customer.address?.trim() ?? null,
+            ...(body.customer.user_id ? { user_id: body.customer.user_id } : {}),
+          })
+          .eq("id", customerId);
+      } else {
+        // Insert new customer record
+        const { data: newCustomer, error: customerError } = await supabase
+          .from("customers")
+          .insert({
+            user_id: body.customer.user_id ?? null,
+            name: body.customer.name.trim(),
+            contact_number: cleanPhone,
+            address: body.customer.address?.trim() ?? null,
+          })
+          .select("id")
+          .single();
+
+        if (customerError || !newCustomer) {
+          return NextResponse.json(
+            { success: false, error: "Failed to save customer information." },
+            { status: 500 }
+          );
+        }
+        customerId = newCustomer.id;
+      }
     }
 
     // ── Insert Order ─────────────────────────────
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .insert({
-        customer_id: customer.id,
+        customer_id: customerId,
         status: "pending",
         total_amount: totalAmount,
         notes: body.notes?.trim() ?? null,

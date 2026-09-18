@@ -33,7 +33,9 @@ create table if not exists products (
 -- ─────────────────────────────────────────
 create table if not exists customers (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete set null,
   name varchar(100) not null,
+  email varchar(255),
   contact_number varchar(20),
   address text,
   created_at timestamptz not null default now()
@@ -47,6 +49,11 @@ create table if not exists orders (
   customer_id uuid references customers(id) on delete set null,
   status varchar(20) not null default 'pending'
     check (status in ('pending','confirmed','preparing','ready','delivered','cancelled')),
+  payment_status varchar(20) not null default 'unpaid'
+    check (payment_status in ('unpaid','paid','refunded','failed')),
+  payment_method varchar(50) default 'paymongo',
+  paymongo_session_id varchar(100),
+  paymongo_payment_id varchar(100),
   total_amount numeric(10,2) not null,
   notes text,
   ordered_at timestamptz not null default now(),

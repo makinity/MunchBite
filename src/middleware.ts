@@ -5,13 +5,13 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const { pathname } = req.nextUrl;
 
-  // Always allow the auth callback route through
-  if (pathname.startsWith("/auth/callback")) {
-    return res;
-  }
-
-  // Only run checks for protected admin routes (not the login page itself)
-  if (!pathname.startsWith("/admin") || pathname === "/admin/login") {
+  // Always allow auth callback and static assets
+  if (
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api/ping") ||
+    pathname.startsWith("/api/webhooks")
+  ) {
     return res;
   }
 
@@ -33,11 +33,23 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // No session → redirect to admin login
-  if (!session) {
+  const isAdminRoute = pathname.startsWith("/admin") && pathname !== "/admin/login";
+  const isCustomerProtectedRoute = pathname.startsWith("/order") || pathname.startsWith("/account");
+
+  // Protect Admin Dashboard Routes
+  if (isAdminRoute && !user) {
     const loginUrl = new URL("/admin/login", req.url);
+    loginUrl.searchParams.set("redirectTo", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Protect Customer Routes (/order, /account)
+  if (isCustomerProtectedRoute && !user) {
+    const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -46,5 +58,12 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/auth/callback"],
+  matcher: [
+    "/admin/:path*",
+    "/order/:path*",
+    "/order",
+    "/account/:path*",
+    "/account",
+    "/auth/callback",
+  ],
 };
