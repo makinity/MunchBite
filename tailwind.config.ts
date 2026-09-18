@@ -9,11 +9,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        cream: "#FFF8E7",
+        chocolate: "#5C3A2E",
+        peach: "#FFB07C",
+        "soft-pink": "#F7C8C8",
+      },
+      fontFamily: {
+        nunito: ["var(--font-nunito)", "sans-serif"],
+      },
+      borderRadius: {
+        "4xl": "2rem",
       },
     },
   },
   plugins: [],
 };
+
 export default config;
